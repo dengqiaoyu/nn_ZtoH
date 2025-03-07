@@ -2,9 +2,6 @@
 	"folders": [
 		{
 			"path": "."
-		},
-		{
-			"path": "../learn_gpt/nn_ztoh/karpathy/makemore"
 		}
 	],
 	"settings": {
