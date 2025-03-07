@@ -2,6 +2,9 @@
 	"folders": [
 		{
 			"path": "."
+		},
+		{
+			"path": "../learn_gpt/nn_ztoh/karpathy/makemore"
 		}
 	],
 	"settings": {
@@ -10,10 +13,15 @@
 			79
 		],
 		"cSpell.words": [
+			"bigram",
 			"cnts",
 			"figsize",
+			"imshow",
+			"itos",
 			"micrograd",
+			"multinomial",
 			"scorei",
+			"stoi",
 			"topo",
 			"xrow"
 		]
