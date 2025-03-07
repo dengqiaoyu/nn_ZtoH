@@ -1,0 +1,21 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"editor.rulers": [
+			72,
+			79
+		],
+		"cSpell.words": [
+			"cnts",
+			"figsize",
+			"micrograd",
+			"scorei",
+			"topo",
+			"xrow"
+		]
+	}
+}
