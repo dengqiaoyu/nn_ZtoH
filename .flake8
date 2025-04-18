@@ -1,0 +1,8 @@
+[flake8]
+
+# Ignore E203 (whitespace before ':') to make flake8 compatible with Black formatter
+# This is an intentional conflict - Black deliberately adds whitespace before ':' in slices
+# following PEP 8 style recommendations, while flake8's E203 warns against this practice.
+# Black's formatting is not configurable in this regard, so we adjust flake8 instead.
+# See Black documentation: https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#slices
+extend-ignore = E203
