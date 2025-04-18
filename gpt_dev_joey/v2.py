@@ -1,4 +1,5 @@
 from typing import Callable, Final
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -6,20 +7,39 @@ import torch.nn.functional as F
 # -----------------------------------------------------------------------------
 # hyperparameters
 
+# Debug parameters
+# batch_size: Final[int] = 32
+# block_size: Final[int] = 8
+# n_embd: Final[int] = 32
+# n_heads: Final[int] = 4
+# n_blocks: Final[int] = 3
+# max_steps: Final[int] = 5000
+# eval_interval: Final[int] = 500
+# eval_iters: Final[int] = 200
+# dropout: Final[float] = 0.1
+# learning_rate: Final[float] = 1e-3
+# device: Final[str] = "cuda" if torch.cuda.is_available() else "cpu"
+
 # The number of independent sequences to process in parallel
-batch_size: Final[int] = 32
+batch_size: Final[int] = 64
 # The maximum context length for predictions
-block_size: Final[int] = 8
-n_embd: Final[int] = 32
-n_heads: Final[int] = 4
-n_blocks: Final[int] = 3
+block_size: Final[int] = 256
+n_embd: Final[int] = 384
+n_heads: Final[int] = 6
+n_blocks: Final[int] = 6
+dropout: Final[float] = 0.2
 max_steps: Final[int] = 5000
+learning_rate: Final[float] = 3e-4
+
 eval_interval: Final[int] = 500
 eval_iters: Final[int] = 200
-dropout: Final[float] = 0.1
-learning_rate: Final[float] = 1e-3
 device: Final[str] = "cuda" if torch.cuda.is_available() else "cpu"
 
+retrain_anyway: Final[bool] = False
+checkpoint_path: Final[str] = "gpt_dev_joey/checkpoint.pt"
+
+n_tokens_to_file: Final[int] = 5000
+generation_file_path: Final[str] = "gpt_dev_joey/output.txt"
 
 # -----------------------------------------------------------------------------
 # Seed
@@ -299,6 +319,7 @@ class BigramLanguageModel(nn.Module):
 
     def generate(self, idx: torch.Tensor, max_new_tokens: int) -> torch.Tensor:
         """Generate a sequence of tokens."""
+        self.eval()
         # idx is (B, T) tensor of integers.
         for _ in range(max_new_tokens):
             # Crop idx to be within the block size: always choose the last
@@ -315,6 +336,7 @@ class BigramLanguageModel(nn.Module):
             idx_next: torch.Tensor = torch.multinomial(probs, num_samples=1)
             # append the sampled token to the input
             idx = torch.cat((idx, idx_next), dim=1)  # (B, T + 1)
+        self.train()
         return idx
 
 
@@ -324,12 +346,37 @@ class BigramLanguageModel(nn.Module):
 model: BigramLanguageModel = BigramLanguageModel(
     vocab_size, n_embd, n_heads
 ).to(device)
+
+# Check if there is any existing weights to load
+
+last_step: int
 optimizer: torch.optim.AdamW = torch.optim.AdamW(
     model.parameters(), lr=learning_rate
 )
 
+if not retrain_anyway and os.path.exists(checkpoint_path):
+    checkpoint: Final[dict] = torch.load(checkpoint_path)
+    model.load_state_dict(checkpoint["model_state_dict"])
+    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+    last_step = checkpoint["step"]
+    train_loss = checkpoint["train_loss"]
+    val_loss = checkpoint["val_loss"]
+    print(
+        f"Loaded checkpoint at step {last_step}, "
+        f"train loss {train_loss:.4f}, val loss {val_loss:.4f}"
+    )
+else:
+    last_step = 0
+
+should_train: Final[bool] = last_step < (max_steps - 1)
+if should_train:
+    print(f"Start training from step {last_step} to {max_steps - 1}")
+
 # Training loop
-for step in range(max_steps):
+step: int = 0
+train_loss: float = 0.0
+val_loss: float = 0.0
+for step in range(last_step + 1, max_steps):
     # Sample a batch of data
     x, y = get_batch(
         train_data,
@@ -357,18 +404,54 @@ for step in range(max_steps):
         )
 
     # Forward pass
-    logits, loss = model(x, y)
+    _, loss = model(x, y)
 
     # Backward pass
     optimizer.zero_grad(set_to_none=True)
     loss.backward()
     optimizer.step()
 
+# Save the model
+if should_train:
+    torch.save(
+        {
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "step": step,
+            "train_loss": train_loss,
+            "val_loss": val_loss,
+        },
+        checkpoint_path,
+    )
+    print(f"Model saved to {checkpoint_path}")
+
 # -----------------------------------------------------------------------------
 # Sample from the model
 
-context: Final[torch.Tensor] = torch.zeros(
-    (1, 1), dtype=torch.long, device=device
-)  # starting from time step 0
-out_idx = model.generate(context, max_new_tokens=500)[0].tolist()
-print(decode(out_idx))
+model.eval()
+
+
+def generate_text(model: BigramLanguageModel, max_new_tokens: int) -> str:
+    context: Final[torch.Tensor] = torch.zeros(
+        (1, 1), dtype=torch.long, device=device
+    )
+    out_idx: Final = model.generate(context, max_new_tokens=max_new_tokens)[
+        0
+    ].tolist()
+    return decode(out_idx)
+
+
+# starting from time step 0
+out: Final[str] = generate_text(model, max_new_tokens=500)
+print("Generated text:")
+print("=" * 20)
+print(out)
+print("=" * 20)
+
+if n_tokens_to_file > 0:
+    long_out: Final[str] = generate_text(
+        model, max_new_tokens=n_tokens_to_file
+    )
+    with open(generation_file_path, "w", encoding="utf-8") as f:
+        f.write(long_out)
+        print(f"Output saved to {generation_file_path}")
