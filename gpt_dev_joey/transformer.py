@@ -256,8 +256,8 @@ class Block(nn.Module):
 
 
 # Define the model
-class BigramLanguageModel(nn.Module):
-    """A bigram language model."""
+class TransformerModel(nn.Module):
+    """A transformer-based language model."""
 
     def __init__(self, vocab_size: int, n_embd: int, n_heads: int) -> None:
         super().__init__()
@@ -343,9 +343,9 @@ class BigramLanguageModel(nn.Module):
 # -----------------------------------------------------------------------------
 # Doing the training
 
-model: BigramLanguageModel = BigramLanguageModel(
-    vocab_size, n_embd, n_heads
-).to(device)
+model: TransformerModel = TransformerModel(vocab_size, n_embd, n_heads).to(
+    device
+)
 
 # Check if there is any existing weights to load
 
@@ -431,7 +431,7 @@ if should_train:
 model.eval()
 
 
-def generate_text(model: BigramLanguageModel, max_new_tokens: int) -> str:
+def generate_text(model: TransformerModel, max_new_tokens: int) -> str:
     context: Final[torch.Tensor] = torch.zeros(
         (1, 1), dtype=torch.long, device=device
     )
